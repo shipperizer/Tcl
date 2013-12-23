@@ -550,7 +550,7 @@ proc check_status {} {
 #returns indexes of cards played in the last_turn aka turn_1
 proc diff { turn_1 turn_2 } {
 	set cards_played []
-	for {set i 0} {$i < llength $turn_1} {incr i} {
+	for {set i 0} {$i < [llength $turn_1]} {incr i} {
 		if { [[lindex $turn_1 $i] == 0] && [[lindex $turn_2 $i] != 0] } {
 			lappend $cards_played $i
 		}
@@ -560,7 +560,7 @@ proc diff { turn_1 turn_2 } {
 
 #returns a boolean, cards must be a list of indexes of the cards played in the previous turn
 proc cheated { cards kind } {
-	for {set i 0} {$i < llength $cards} {incr i} {
+	for {set i 0} {$i < [llength $cards]} {incr i} {
 		if { [lindex $cards $i] % 13 != $kind } { return true }
 	}
 	return false
@@ -624,17 +624,17 @@ proc cheat_action {} {
 	set cards_played_last_turn [ diff [lindex $cards_played_on_turns 0] [lindex $cards_played_on_turns 1] ]
 	set indexes [lsearch $cards_played_last_turn 0]
 	if { [cheated $cards_played_last_turn $kind_played_last_turn] } {
-			for {set i 0} {$i < llength $indexes} {incr i} {
+			for {set i 0} {$i < [llength $indexes]} {incr i} {
 				set cards_played_last_turn [lreplace $cards_played_last_turn [lindex $indexes $i] [lindex $indexes $i] $previous_player_id] 	
 			}
 		} else {
-			for {set i 0} {$i < llength $indexes} {incr i} {
+			for {set i 0} {$i < [llength $indexes]} {incr i} {
 				set cards_played_last_turn [lreplace $cards_played_last_turn [lindex $indexes $i] [lindex $indexes $i] $user_id] 	
 			}
 		}
     
     set next_turn_cards $cards_played_last_turn
-                
+
 	# set cards_played_last_turn []
 
 	# # Compare the previous two turns. If an entry does not match
