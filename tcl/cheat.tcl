@@ -107,7 +107,7 @@ proc play_action {} {
 
 	incr turn_no
 
- 	if {last_action == "call cheat" || turn_no == 0} {set last_kind $kind}	
+ 	if {$last_action == "call cheat" || $turn_no == 0} {set last_kind $kind}	
 	if {$DEBUG==1} {ob::log::write ERROR "the current turn is: $turn_no"}
 
 	set action {play cards}
