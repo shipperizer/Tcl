@@ -51,6 +51,7 @@ $(document).ready(function () {
     $("#play_btn").click(function() {
             if(turn==0) return;
             cards=getSelectedCards();
+            console.debug(cards);
             if (new_round==1 && kind==-1) {alert("Choose a kind");return;}
             $.ajax({
                     url: "##TP_CGI_URL##?action=CHEAT_play_action&user_id="+PERSONAL_USER_ID+"&game_id="+GAME_ID+"&kind="+kind+"&cards="+cards,                    

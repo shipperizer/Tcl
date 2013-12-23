@@ -547,6 +547,25 @@ proc check_status {} {
 	
 }
 
+#returns indexes of cards played in the last_turn aka turn_1
+proc diff { turn_1 turn_2 } {
+	set cards_played []
+	for {set i 0} {$i < llength $turn_1} {incr i} {
+		if { [[lindex $turn_1 $i] == 0] && [[lindex $turn_2 $i] != 0] } {
+			lappend $cards_played $i
+		}
+	}
+	return $cards_played
+}
+
+#returns a boolean, cards must be a list of indexes of the cards played in the previous turn
+proc cheated { cards kind } {
+	for {set i 0} {$i < llength $cards} {incr i} {
+		if { [lindex $cards $i] % 13 != $kind } { return true }
+	}
+	return false
+}
+
 proc cheat_action {} {
 	
 	global DB DEBUG
@@ -586,8 +605,8 @@ proc cheat_action {} {
 	# Get the kind of cards played in the previous turn
 	set kind_played_last_turn [db_get_col $results 0 kind]
 	
-	# Get the ID of the previous player
-	set previous_player_id [db_get_col $results 1 user_id]
+	# Get the ID of the previous player (first row not second, it's the last turn player that we want to track)
+	set previous_player_id [db_get_col $results 0 user_id]  
 
 	# Get the number of the previous turn
 	set previous_turn_no [db_get_col $results 0 turn_no]
@@ -595,51 +614,65 @@ proc cheat_action {} {
 	# Put the cards from the previous 2 turns in the turns list
 	for {set i 0} {$i < [db_get_nrows $results]} {incr i} {
 		set cards [db_get_col $results $i cards]
-		set cards [split [string trim $cards "[]"] ","]
+		set cards [split [string trim $cards \"\[\] ] ","]
 		lappend cards_played_on_turns $cards
 		puts "cards: $cards"
 		puts "cards_played_on_turns: $cards_played_on_turns"
 	}
 
 
-	set cards_played_last_turn []
-
-	# Compare the previous two turns. If an entry does not match
-	# put its index (the card number) into the cards_played list
-	for {set i 0} {$i < [llength [lindex $cards_played_on_turns 0]]} {incr i} {
-		if {[lindex $cards_played_on_turns 0 $i] != [lindex $cards_played_on_turns 1 $i]} {
-			lappend cards_played_last_turn $i
-		}
-	}
-
-	set has_cheated 0
-
-	# For each card in cards_played, find the kind of the card
-	# and check if it is the same as the kind fetched from the DB.
-	# If it is not the same, the player cheated.
-	for {set i 0} {$i < [llength $cards_played_last_turn]} {incr i} {
-		set kind_of_card [expr [lindex $cards_played_last_turn $i] % 13]
-		if {$kind_of_card != $kind_played_last_turn} {
-			set has_cheated 1
-			break
-		}
-	}
-
-	# Make the next turn a copy of the previous turn
-	set next_turn_cards [lindex $cards_played_on_turns 1]
-
-	# Reassign cards from table to the previous player if
-	# they cheated, or to the current player if they didn't
-	# cheat
-	for {set i 0} {$i < [llength $next_turn_cards]} {incr i} {
-		if {[lindex $next_turn_cards $i] == 0} {
-			if {$has_cheated} {
-				lset next_turn_cards $i $previous_player_id
-			} else {
-				lset next_turn_cards $i $user_id
+	set cards_played_last_turn [ diff [lindex $cards_played_on_turns 0] [lindex $cards_played_on_turns 1] ]
+	set indexes [lsearch $cards_played_last_turn 0]
+	if { [cheated $cards_played_last_turn $kind_played_last_turn] } {
+			for {set i 0} {$i < llength $indexes} {incr i} {
+				set cards_played_last_turn [lreplace $cards_played_last_turn [lindex $indexes $i] [lindex $indexes $i] $previous_player_id] 	
+			}
+		} else {
+			for {set i 0} {$i < llength $indexes} {incr i} {
+				set cards_played_last_turn [lreplace $cards_played_last_turn [lindex $indexes $i] [lindex $indexes $i] $user_id] 	
 			}
 		}
-	}
+    
+    set next_turn_cards $cards_played_last_turn
+                
+	# set cards_played_last_turn []
+
+	# # Compare the previous two turns. If an entry does not match
+	# # put its index (the card number) into the cards_played list
+	# for {set i 0} {$i < [llength [lindex $cards_played_on_turns 0]]} {incr i} {
+	# 	if {[lindex $cards_played_on_turns 0 $i] != [lindex $cards_played_on_turns 1 $i]} {
+	# 		lappend cards_played_last_turn $i
+	# 	}
+	# }
+
+	# set has_cheated 0
+
+	# # For each card in cards_played, find the kind of the card
+	# # and check if it is the same as the kind fetched from the DB.
+	# # If it is not the same, the player cheated.
+	# for {set i 0} {$i < [llength $cards_played_last_turn]} {incr i} {
+	# 	set kind_of_card [expr [lindex $cards_played_last_turn $i] % 13]
+	# 	if {$kind_of_card != $kind_played_last_turn} {
+	# 		set has_cheated 1
+	# 		break
+	# 	}
+	# }
+
+	# # Make the next turn a copy of the previous turn
+	# set next_turn_cards [lindex $cards_played_on_turns 1]
+
+	# # Reassign cards from table to the previous player if
+	# # they cheated, or to the current player if they didn't
+	# # cheat
+	# for {set i 0} {$i < [llength $next_turn_cards]} {incr i} {
+	# 	if {[lindex $next_turn_cards $i] == 0} {
+	# 		if {$has_cheated} {
+	# 			lset next_turn_cards $i $previous_player_id
+	# 		} else {
+	# 			lset next_turn_cards $i $user_id
+	# 		}
+	# 	}
+	# }
 
 	# Now loop through and see if any player has 4 of a kind.
 	# If they do, then assign these to discarded (-1)
@@ -663,7 +696,7 @@ proc cheat_action {} {
 	set action "call cheat"
 	
 	set json_cards [join $next_turn_cards ","]
-	set json_cards "$json_cards"
+	set json_cards "[$json_cards]"
 
 	# If the previous player cheated, then the current player gets
 	# another turn. If not, then play moves on to the next player.
@@ -714,7 +747,7 @@ proc cheat_action {} {
 		ob::log::write "$player_has_won has won!"
 	}
 
-	create_json_response $game_id $json_cards -1 $next_player_id $turn_no 1 $user_id
+	create_json_response $game_id $json_cards $kind_played_last_turn $next_player_id $turn_no 1 $user_id
 }
 
 proc get_next_player {current_player_id game_id} {
